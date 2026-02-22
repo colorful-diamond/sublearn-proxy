@@ -1,0 +1,16 @@
+services:
+  - type: web
+    runtime: python
+    name: sublearn-proxy-1
+    plan: starter
+    buildCommand: ""
+    startCommand: python3 proxy_server.py
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: PROXY_USER
+        value: sublearn
+      - key: PROXY_PASS
+        value: Pr0xy@2026!Render
+      - key: AUTH_REQUIRED
+        value: true
