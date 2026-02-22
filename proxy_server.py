@@ -134,10 +134,32 @@ def json_response(data, status=200):
 
 async def handle_client(reader, writer):
     try:
-        data = await asyncio.wait_for(reader.read(65536), timeout=30)
+        # Read until we have full headers (Render's proxy may split across TCP segments)
+        data = b""
+        while b"\r\n\r\n" not in data:
+            chunk = await asyncio.wait_for(reader.read(65536), timeout=30)
+            if not chunk:
+                break
+            data += chunk
         if not data:
             writer.close()
             return
+
+        # If Content-Length present, read remaining body
+        header_end = data.find(b"\r\n\r\n")
+        if header_end >= 0:
+            header_text = data[:header_end].decode("utf-8", errors="replace").lower()
+            for line in header_text.split("\r\n"):
+                if line.startswith("content-length:"):
+                    expected = int(line.split(":", 1)[1].strip())
+                    body_so_far = len(data) - header_end - 4
+                    while body_so_far < expected:
+                        chunk = await asyncio.wait_for(reader.read(65536), timeout=30)
+                        if not chunk:
+                            break
+                        data += chunk
+                        body_so_far += len(chunk)
+                    break
 
         method, path, version, headers, body = parse_request(data)
         if not method:
